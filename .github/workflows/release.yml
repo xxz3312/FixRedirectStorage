@@ -6,11 +6,11 @@ on:
       tag:
         description: Release tag
         required: true
-        default: v0.19
+        default: v0.21
       run_id:
-        description: Successful Build LSPosed module run containing the APK
+        description: Successful Build LSPosed module run containing a signed Release APK
         required: true
-        default: '37263604560'
+        default: '37363720707'
       target:
         description: Source commit or branch for the release tag
         required: true
@@ -26,24 +26,24 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      RELEASE_TAG: ${{ inputs.tag || 'v0.19' }}
+      RELEASE_TAG: ${{ inputs.tag || 'v0.21' }}
       RELEASE_TARGET: ${{ inputs.target || github.sha }}
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: storage-isolation-visibility-fix-debug
-          run-id: ${{ inputs.run_id || '37263604560' }}
+          name: storage-isolation-visibility-fix-release
+          run-id: ${{ inputs.run_id || '37363720707' }}
           github-token: ${{ github.token }}
           path: dist
       - name: Publish existing APK
         shell: bash
         run: |
           set -euo pipefail
-          test -s dist/app-debug.apk
+          test -s dist/app-release.apk
           asset="FixRedirectStorage-${RELEASE_TAG#v}-API102.apk"
-          mv dist/app-debug.apk "dist/$asset"
+          mv dist/app-release.apk "dist/$asset"
           cat > release-notes.md <<'NOTES'
-          Adds a Material 3 settings screen, automatically copies exported log files to the clipboard, and adds a launcher icon visibility toggle. APK version names now use numbers only.
+          Reduces APK size with code and resource shrinking and adds adaptive and monochrome launcher icons. Published APKs now use non-debuggable Release builds.
           NOTES
           if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
             gh release create "$RELEASE_TAG" --target "$RELEASE_TARGET" \
