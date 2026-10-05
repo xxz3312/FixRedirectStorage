@@ -10,7 +10,7 @@ on:
       run_id:
         description: Successful Build LSPosed module run containing a signed Release APK
         required: true
-        default: '37363720707'
+        default: '37364580221'
       target:
         description: Source commit or branch for the release tag
         required: true
@@ -32,7 +32,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: storage-isolation-visibility-fix-release
-          run-id: ${{ inputs.run_id || '37363720707' }}
+          run-id: ${{ inputs.run_id || '37364580221' }}
           github-token: ${{ github.token }}
           path: dist
       - name: Publish existing APK
