@@ -1,9 +1,15 @@
 <resources>
     <string name="app_name">存储隔离可见性修复</string>
     <string name="module_description">Allow Storage Isolation package queries on Android 17</string>
-    <string name="export_logs">保存诊断日志到 Download</string>
-    <string name="ready">点击按钮导出日志。首次使用请在 KernelSU 中授予本模块 root 权限。</string>
+    <string name="version_label">版本 %1$s</string>
+    <string name="diagnostics">诊断日志</string>
+    <string name="export_logs">保存并复制日志文件</string>
+    <string name="ready">日志保存到 Download 后，会自动复制文件到剪贴板。首次导出请在 KernelSU 中授予本模块 root 权限。</string>
     <string name="working">正在收集日志…</string>
-    <string name="export_success">已保存：%1$s</string>
+    <string name="export_success">已保存到 Download：%1$s\n日志文件已复制，可在支持文件粘贴的应用中粘贴。</string>
     <string name="export_failed">保存失败：%1$s</string>
+    <string name="copy_failed">已保存到 Download：%1$s\n复制失败：%2$s</string>
+    <string name="hide_icon">隐藏桌面图标</string>
+    <string name="hide_icon_hint">隐藏后可从 LSPosed 的模块设置打开此页面，关闭开关即可恢复图标。启动器可能需要稍等片刻才刷新。</string>
+    <string name="setting_failed">设置失败：%1$s</string>
 </resources>
