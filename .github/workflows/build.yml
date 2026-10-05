@@ -27,8 +27,8 @@ jobs:
         run: gradle :app:assembleRelease :app:assembleDebug --stacktrace
       - name: Verify release APK
         run: |
-          apksigner verify app/build/outputs/apk/release/app-release.apk
-          if aapt dump badging app/build/outputs/apk/release/app-release.apk | grep -q '^application-debuggable'; then
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify app/build/outputs/apk/release/app-release.apk
+          if "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/release/app-release.apk | grep -q '^application-debuggable'; then
             echo 'Release APK must not be debuggable'
             exit 1
           fi
