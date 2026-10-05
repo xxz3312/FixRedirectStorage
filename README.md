@@ -22,9 +22,13 @@ Version 0.18 adds a PackageManagerInternal fallback when snapshot lookup is unav
 
 GitHub Actions builds the APK on pushes to main, or through **Actions → Build LSPosed module → Run workflow**. Download the `storage-isolation-visibility-fix-debug` artifact.
 
-The module app retains **Save logs to Download**. It needs root only when exporting logs. Runtime logs contain hook setup and failures.
+Version 0.19 adds a Material 3 settings screen with dark mode and supported-device dynamic colors. Exporting diagnostics saves a log to Download and copies a FileProvider file URI to the clipboard; pasting files requires a receiving app that supports URI clipboard items. Only the diagnostic read requires root. The clipboard copy is served from the app cache and can be removed by clearing the cache.
 
-GitHub Actions validates compilation and packaging. Version 0.18 needs a device check after installation to validate dynamic UID resolution on the device's framework.
+The **Hide launcher icon** switch disables only a launcher alias. Open the module settings from LSPosed to restore the icon. The settings activity remains enabled. The three runtime hooks are unchanged.
+
+Normal changes trigger builds only. Release publishing is manual and requires an explicit request. APK version names use numeric versions such as `0.19`.
+
+GitHub Actions validates compilation and packaging. Version 0.19 needs a device check for UI rendering, file clipboard paste, and launcher visibility on the installed framework.
 
 ## Downloads and license
 
