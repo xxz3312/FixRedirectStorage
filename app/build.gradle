@@ -4,6 +4,10 @@ android {
     namespace 'io.github.storageisolation.visibilityfix'
     compileSdk 35
     buildFeatures { buildConfig true }
+    lint {
+        // Sideloaded LSPosed module; preserve tested target behavior, not a Play Store submission.
+        disable 'ExpiredTargetSdkVersion'
+    }
     buildTypes {
         debug {
             minifyEnabled true
