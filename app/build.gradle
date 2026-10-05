@@ -3,13 +3,17 @@ plugins { id 'com.android.application' }
 android {
     namespace 'io.github.storageisolation.visibilityfix'
     compileSdk 35
+    buildFeatures { buildConfig true }
     defaultConfig {
         applicationId 'io.github.storageisolation.visibilityfix'
         minSdk 30
         targetSdk 28
-        versionCode 18
-        versionName '0.18-api102-uid-fallback'
+        versionCode 19
+        versionName '0.19'
     }
 }
 
-dependencies { compileOnly 'io.github.libxposed:api:102.0.0' }
+dependencies {
+    compileOnly 'io.github.libxposed:api:102.0.0'
+    implementation 'com.google.android.material:material:1.12.0'
+}
