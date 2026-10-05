@@ -24,7 +24,19 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: Build APK
-        run: gradle :app:assembleDebug --stacktrace
+        run: gradle :app:assembleRelease :app:assembleDebug --stacktrace
+      - name: Verify release APK
+        run: |
+          apksigner verify app/build/outputs/apk/release/app-release.apk
+          if aapt dump badging app/build/outputs/apk/release/app-release.apk | grep -q '^application-debuggable'; then
+            echo 'Release APK must not be debuggable'
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: storage-isolation-visibility-fix-release
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
           name: storage-isolation-visibility-fix-debug
