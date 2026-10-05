@@ -6,11 +6,11 @@ on:
       tag:
         description: Release tag
         required: true
-        default: v0.18
+        default: v0.19
       run_id:
         description: Successful Build LSPosed module run containing the APK
         required: true
-        default: '37232496128'
+        default: '37263604560'
       target:
         description: Source commit or branch for the release tag
         required: true
@@ -26,13 +26,13 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      RELEASE_TAG: ${{ inputs.tag || 'v0.18' }}
+      RELEASE_TAG: ${{ inputs.tag || 'v0.19' }}
       RELEASE_TARGET: ${{ inputs.target || github.sha }}
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: storage-isolation-visibility-fix-debug
-          run-id: ${{ inputs.run_id || '37232496128' }}
+          run-id: ${{ inputs.run_id || '37263604560' }}
           github-token: ${{ github.token }}
           path: dist
       - name: Publish existing APK
@@ -43,7 +43,7 @@ jobs:
           asset="FixRedirectStorage-${RELEASE_TAG#v}-API102.apk"
           mv dist/app-debug.apk "dist/$asset"
           cat > release-notes.md <<'NOTES'
-          Adds fallback UID lookup and retries failed lookups while preserving the existing three hooks. Fixes stale AppID caching after reinstall and reflection access to the internal package manager service.
+          Adds a Material 3 settings screen, automatically copies exported log files to the clipboard, and adds a launcher icon visibility toggle. APK version names now use numbers only.
           NOTES
           if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
             gh release create "$RELEASE_TAG" --target "$RELEASE_TARGET" \
