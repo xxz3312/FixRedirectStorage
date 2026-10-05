@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.VisibilityFix" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#426650</item>
+        <item name="colorSecondary">#526456</item>
+        <item name="android:windowLightStatusBar">?attr/isLightTheme</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:navigationBarColor">?attr/colorSurface</item>
+    </style>
+</resources>
