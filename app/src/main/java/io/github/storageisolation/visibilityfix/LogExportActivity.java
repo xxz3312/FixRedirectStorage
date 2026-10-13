@@ -5,6 +5,8 @@ import android.content.ClipboardManager;
 import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.pm.PackageManager;
+import android.content.pm.PackageInfo;
+import android.view.View;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -16,6 +18,7 @@ import androidx.core.content.FileProvider;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.color.DynamicColors;
+import com.google.android.material.color.MaterialColors;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.appbar.MaterialToolbar;
 import java.io.ByteArrayOutputStream;
@@ -31,6 +34,9 @@ import java.util.Locale;
 public final class LogExportActivity extends AppCompatActivity {
     private TextView status;
     private MaterialButton export;
+    private TextView versionWarning;
+    private boolean exporting;
+    private boolean targetSupported;
 
     @Override protected void onCreate(Bundle state) {
         DynamicColors.applyToActivityIfAvailable(this);
@@ -61,6 +67,11 @@ public final class LogExportActivity extends AppCompatActivity {
         export.setText(R.string.export_logs);
         logs.addView(export, new LinearLayout.LayoutParams(-1, -2));
         export.setOnClickListener(v -> saveLogs());
+        versionWarning = text("");
+        versionWarning.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium);
+        versionWarning.setTextColor(MaterialColors.getColor(export, com.google.android.material.R.attr.colorError));
+        versionWarning.setVisibility(View.GONE);
+        logs.addView(versionWarning, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout settings = card(panel);
         MaterialSwitch hide = new MaterialSwitch(this);
@@ -79,6 +90,43 @@ public final class LogExportActivity extends AppCompatActivity {
                 status.setText(getString(R.string.setting_failed, error.toString()));
             }
         });
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        refreshTargetVersion();
+    }
+
+    private boolean refreshTargetVersion() {
+        boolean supported = false;
+        String warning;
+        String detail;
+        try {
+            PackageInfo info = getPackageManager().getPackageInfo(TargetVersion.PACKAGE, 0);
+            supported = TargetVersion.supported(info.getLongVersionCode(), info.versionName);
+            warning = getString(TargetVersion.older(info.getLongVersionCode(), info.versionName)
+                    ? R.string.target_outdated : R.string.target_unsupported);
+            detail = getString(R.string.target_version_detail,
+                    info.versionName == null ? getString(R.string.unknown_version) : info.versionName,
+                    TargetVersion.LABEL);
+        } catch (PackageManager.NameNotFoundException error) {
+            warning = getString(R.string.target_missing);
+            detail = getString(R.string.target_required, TargetVersion.LABEL);
+        } catch (RuntimeException error) {
+            warning = getString(R.string.target_check_failed);
+            detail = getString(R.string.target_check_retry);
+        }
+        export.setVisibility(supported ? View.VISIBLE : View.GONE);
+        export.setEnabled(supported && !exporting);
+        versionWarning.setVisibility(supported ? View.GONE : View.VISIBLE);
+        if (!supported) {
+            versionWarning.setText(warning);
+            status.setText(detail);
+        } else if (!targetSupported && !exporting) {
+            status.setText(R.string.ready);
+        }
+        targetSupported = supported;
+        return supported;
     }
 
     private ComponentName launcher() {
@@ -115,6 +163,8 @@ public final class LogExportActivity extends AppCompatActivity {
     }
 
     private void saveLogs() {
+        if (exporting || !refreshTargetVersion()) return;
+        exporting = true;
         export.setEnabled(false);
         status.setText(R.string.working);
         String filename = "FixRedirectStorage-" +
@@ -164,7 +214,8 @@ public final class LogExportActivity extends AppCompatActivity {
                         getPackageName() + ".logs", cached);
                 runOnUiThread(() -> {
                     if (isFinishing() || isDestroyed()) return;
-                    export.setEnabled(true);
+                    exporting = false;
+                    if (!refreshTargetVersion()) return;
                     try {
                         ClipboardManager clipboard = getSystemService(ClipboardManager.class);
                         if (clipboard == null) throw new IllegalStateException("Clipboard unavailable");
@@ -179,7 +230,8 @@ public final class LogExportActivity extends AppCompatActivity {
                 if (cached != null) cached.delete();
                 runOnUiThread(() -> {
                     if (isFinishing() || isDestroyed()) return;
-                    export.setEnabled(true);
+                    exporting = false;
+                    if (!refreshTargetVersion()) return;
                     status.setText(getString(R.string.export_failed, error.toString()));
                 });
             }
