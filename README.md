@@ -12,6 +12,12 @@ Three operations are required on the tested framework:
 
 Existing rule records come from the original service. The module does not fabricate rules or write the rule database. Root service process detection and verbose diagnostic tracing remain removed. A short fallback count is logged to distinguish package enumeration from server record retrieval.
 
+## Compatibility diagnostics (0.22)
+
+The app-side fallback validates the complete list/record/factory contract before hooking. The original named ef1/g10 contract remains supported; the bh1 wrapper is resolved by unique method signatures and a uniquely matching factory when names change. Ambiguous or unsupported contracts are rejected. This is structural compatibility, not confirmation against an uploaded 8.7.4 APK.
+
+Package enumeration includes disabled components and permission metadata. Per-package exceptions no longer stop recovery after five failures. Empty service records remain omitted according to the original flags; no default rules are fabricated. Logs now report null-record counts, omitted samples, the list's second argument, application user, versions, and exception context. The supplied logs prove hook installation failure in one case and flag-dependent null records in the other; they do not prove that all omitted records should appear in the UI.
+
 ## Install and build
 
 Keep the original Storage Isolation APK. Install the module APK, enable it in LSPosed, and select the Android system / `system` scope plus `moe.shizuku.redirectstorage`. Reboot after updating. This uses modern libxposed API 102.
