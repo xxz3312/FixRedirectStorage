@@ -2,6 +2,9 @@ package io.github.storageisolation.visibilityfix;
 
 import android.content.Context;
 import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import dalvik.system.DexFile;
+import java.util.Enumeration;
 import android.util.Log;
 import android.os.SystemClock;
 import java.lang.reflect.Method;
@@ -170,61 +173,134 @@ public final class VisibilityHook extends XposedModule {
         if (!TARGET_PACKAGE.equals(param.getPackageName())) return;
         try {
             ClassLoader loader = param.getDefaultClassLoader();
-            Class<?> type = Class.forName(TARGET_PACKAGE + ".ef1", false, loader);
-            Method method = type.getDeclaredMethod("尾巴捏捏", int.class, int.class);
-            hook(method).intercept(chain -> {
+            ServiceBinding binding = resolveServiceBinding(loader,
+                    param.getApplicationInfo().sourceDir,
+                    param.getApplicationInfo().splitSourceDirs);
+            hook(binding.list).intercept(chain -> {
                 Object result = chain.proceed();
                 if (result instanceof List && ((List<?>) result).isEmpty()) {
-                    return recoverServiceRecords(loader, type,
-                            (Integer) chain.getArg(0), result);
+                    return recoverServiceRecords(binding, (Integer) chain.getArg(0),
+                            (Integer) chain.getArg(1), result);
                 }
                 return result;
             });
-            log(Log.INFO, TAG, "Empty service list fallback installed");
+            log(Log.INFO, TAG, "Service list fallback installed: "
+                    + binding.list.getDeclaringClass().getName() + "." + binding.list.getName()
+                    + " record=" + binding.record.getName()
+                    + " factory=" + binding.factory.getDeclaringClass().getName()
+                    + "." + binding.factory.getName());
         } catch (Throwable error) {
-            log(Log.ERROR, TAG, "Cannot hook Storage Isolation service list", error);
+            log(Log.ERROR, TAG, "No complete supported Storage Isolation service contract: "
+                    + error, error);
         }
     }
 
-    private Object recoverServiceRecords(ClassLoader loader, Class<?> serviceType,
-            int flags, Object original) {
+    private ServiceBinding resolveServiceBinding(ClassLoader loader, String base, String[] splits)
+            throws Exception {
+        Exception last = null;
+        for (String name : new String[]{"ef1", "bh1"}) {
+            try {
+                Class<?> service = Class.forName(TARGET_PACKAGE + "." + name, false, loader);
+                boolean original = name.equals("ef1");
+                Method list = ServiceBinding.findList(service, original ? "尾巴捏捏" : null);
+                Method record = ServiceBinding.findRecord(service, original ? "没收门" : null);
+                Method factory = findServiceFactory(loader, service, original, base, splits);
+                return new ServiceBinding(list, record, factory);
+            } catch (Exception error) {
+                last = error;
+            }
+        }
+        throw new ReflectiveOperationException(
+                "Neither ef1 nor bh1 matched a complete, unambiguous service contract", last);
+    }
+
+    private Method findServiceFactory(ClassLoader loader, Class<?> service, boolean original,
+            String base, String[] splits) throws Exception {
+        try {
+            Class<?> owner = Class.forName(TARGET_PACKAGE + ".g10", false, loader);
+            return ServiceBinding.findFactory(owner, service, original ? "嘟嘟噜" : null);
+        } catch (ClassNotFoundException | NoSuchMethodException ignored) {
+            if (original) throw ignored;
+        }
+        // Only needed for the renamed wrapper. Scan once, without initializing classes.
+        List<String> paths = new ArrayList<>();
+        paths.add(base);
+        if (splits != null) java.util.Collections.addAll(paths, splits);
+        Method selected = null;
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (String path : paths) {
+            try (DexFile dex = new DexFile(path)) {
+                Enumeration<String> entries = dex.entries();
+                while (entries.hasMoreElements()) {
+                    String name = entries.nextElement();
+                    if (!name.startsWith(TARGET_PACKAGE + ".") || !seen.add(name)) continue;
+                    try {
+                        Class<?> owner = Class.forName(name, false, loader);
+                        Method candidate = ServiceBinding.findFactory(owner, service, null);
+                        if (selected != null) {
+                            throw new IllegalStateException("Ambiguous service factories: "
+                                    + selected + " and " + candidate);
+                        }
+                        selected = candidate;
+                    } catch (NoSuchMethodException error) {
+                        if (error.getMessage().startsWith("Ambiguous")) throw error;
+                    } catch (LinkageError ignored) {
+                        // Unrelated optional dependencies are not service candidates.
+                    }
+                }
+            }
+        }
+        if (selected == null) throw new NoSuchMethodException("No factory returning " + service.getName());
+        return selected;
+    }
+
+    private Object recoverServiceRecords(ServiceBinding binding,
+            int flags, int listArgument, Object original) {
         try {
             Object app = Class.forName("android.app.ActivityThread")
                     .getDeclaredMethod("currentApplication").invoke(null);
             if (!(app instanceof Context)) return original;
-            List<PackageInfo> installed = ((Context) app).getPackageManager()
-                    .getInstalledPackages(0);
-            Class<?> singleton = Class.forName(TARGET_PACKAGE + ".g10", false, loader);
-            Method getService = singleton.getDeclaredMethod("嘟嘟噜");
-            getService.setAccessible(true);
-            Object service = getService.invoke(null);
-            Method getOne = serviceType.getDeclaredMethod("没收门",
-                    String.class, int.class, int.class);
-            getOne.setAccessible(true);
+            Context context = (Context) app;
+            List<PackageInfo> installed = context.getPackageManager().getInstalledPackages(
+                    PackageManager.MATCH_DISABLED_COMPONENTS | PackageManager.GET_PERMISSIONS);
+            Object service = binding.factory.invoke(null);
+            if (service == null) {
+                log(Log.WARN, TAG, "Service factory returned null; preserving original list");
+                return original;
+            }
             List<Object> recovered = new ArrayList<>();
+            List<String> omittedSample = new ArrayList<>();
             int failures = 0;
+            int nullRecords = 0;
             for (PackageInfo info : installed) {
                 if (info == null || info.packageName == null) continue;
-                int userId = info.applicationInfo == null ? 0
-                        : info.applicationInfo.uid / 100000;
+                int userId = info.applicationInfo == null
+                        ? android.os.Process.myUid() / 100000 : info.applicationInfo.uid / 100000;
                 try {
-                    // IService takes packageName, record flags, then userId.
-                    // Keep the server's existing rule data rather than making default records.
-                    Object record = getOne.invoke(service, info.packageName, flags, userId);
-                    if (record != null) recovered.add(record);
-                } catch (Throwable error) {
-                    if (++failures == 1) {
-                        log(Log.WARN, TAG, "Single package lookup failed", error);
+                    // Preserve record flags and the server's filtering semantics.
+                    Object record = binding.record.invoke(service, info.packageName, flags, userId);
+                    if (record != null) {
+                        recovered.add(record);
+                    } else {
+                        nullRecords++;
+                        if (omittedSample.size() < 8) omittedSample.add(info.packageName + "@u" + userId);
                     }
-                    if (failures >= 5) break;
+                } catch (ReflectiveOperationException | RuntimeException error) {
+                    if (++failures == 1) {
+                        log(Log.WARN, TAG, "Single package lookup failed: "
+                                + info.packageName + ": " + error, error);
+                    }
+                    // An isolated package failure must not truncate all later packages.
                 }
             }
             log(Log.INFO, TAG, "fallback installed=" + installed.size()
-                    + " nativeRecords=" + recovered.size() + " failures=" + failures
-                    + " flags=" + flags);
+                    + " nativeRecords=" + recovered.size() + " nullRecords=" + nullRecords
+                    + " failures=" + failures + " flags=" + flags + " listArg=" + listArgument
+                    + " appUser=" + android.os.Process.myUid() / 100000
+                    + " omittedSample=" + omittedSample);
             return recovered.isEmpty() ? original : recovered;
         } catch (Throwable error) {
-            log(Log.ERROR, TAG, "Cannot recover service records", error);
+            log(Log.ERROR, TAG, "Cannot recover service records: " + error, error);
             return original;
         }
     }
