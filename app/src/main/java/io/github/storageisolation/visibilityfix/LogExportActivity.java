@@ -125,14 +125,17 @@ public final class LogExportActivity extends AppCompatActivity {
                 // Root is used only to read diagnostic sources. The app owns the
                 // exported file and the provider URI, so clipboard readers need no root.
                 String script = "{ "
-                        + "echo '=== Device ==='; date; cat /proc/uptime; "
+                        + "echo '=== Device ==='; date; cat /proc/uptime; getprop ro.build.version.sdk; getprop ro.build.fingerprint; "
                         + "echo '=== Installed APK ==='; pm path io.github.storageisolation.visibilityfix; "
+                        + "echo '=== Target and module versions ==='; "
+                        + "dumpsys package moe.shizuku.redirectstorage | grep -E 'versionName=|versionCode=|userId='; "
+                        + "dumpsys package io.github.storageisolation.visibilityfix | grep -E 'versionName=|versionCode=|userId='; "
                         + "echo '=== LSPosed ==='; cat /data/adb/modules/zygisk_lsposed/module.prop; "
                         + "echo '=== LSPosed module entries ==='; "
-                        + "grep -iE 'SIVisibilityFix|visibilityfix|FixRedirectStorage' "
+                        + "grep -iE -A 24 'SIVisibilityFix' "
                         + "/data/adb/lspd/log/modules_*.log /data/adb/lspd/log/verbose_*.log 2>/dev/null; "
                         + "echo '=== Android logcat entries ==='; "
-                        + "logcat -b all -d 2>/dev/null | grep -iE 'SIVisibilityFix|visibilityfix|FixRedirectStorage'; "
+                        + "logcat -b all -d 2>/dev/null | grep -iE -A 24 'SIVisibilityFix|PackageManagerApisWrapper|StorageRedirect|AndroidRuntime'; "
                         + "echo '=== End ==='; }";
                 Process process = new ProcessBuilder("su", "-c", script)
                         .redirectErrorStream(true).start();
