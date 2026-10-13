@@ -27,12 +27,13 @@ android {
         applicationId 'io.github.storageisolation.visibilityfix'
         minSdk 30
         targetSdk 28
-        versionCode 21
-        versionName '0.21'
+        versionCode 22
+        versionName '0.22'
     }
 }
 
 dependencies {
+    testImplementation 'junit:junit:4.13.2'
     compileOnly 'io.github.libxposed:api:102.0.0'
     implementation 'com.google.android.material:material:1.12.0'
 }
