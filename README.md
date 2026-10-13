@@ -14,7 +14,7 @@ Existing rule records come from the original service. The module does not fabric
 
 ## Compatibility diagnostics (0.22)
 
-The app-side fallback validates the complete list/record/factory contract before hooking. The original named ef1/g10 contract remains supported; the bh1 wrapper is resolved by unique method signatures and a uniquely matching factory when names change. Ambiguous or unsupported contracts are rejected. This is structural compatibility, not confirmation against an uploaded 8.7.4 APK.
+The app-side fallback scans target-package classes in the base APK and splits without initializing them. It resolves a unique concrete service with a non-static `(int,int) -> List` method, a non-static `(String,int,int) -> reference` record method, and a unique static zero-argument factory returning that service type. It uses no obfuscated class or method name table. Multiple complete matches are rejected rather than hooked. Discovery runs once per app process; only metadata is inspected until the fallback is actually called. Signature changes or package relocation still require renewed analysis; this is structural compatibility, not verification against the affected APK.
 
 Package enumeration includes disabled components and permission metadata. Per-package exceptions no longer stop recovery after five failures. Empty service records remain omitted according to the original flags; no default rules are fabricated. Logs now report null-record counts, omitted samples, the list's second argument, application user, versions, and exception context. The supplied logs prove hook installation failure in one case and flag-dependent null records in the other; they do not prove that all omitted records should appear in the UI.
 
