@@ -229,7 +229,8 @@ public final class VisibilityHook extends XposedModule {
         Method selected = null;
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (String path : paths) {
-            try (DexFile dex = new DexFile(path)) {
+            DexFile dex = new DexFile(path);
+            try {
                 Enumeration<String> entries = dex.entries();
                 while (entries.hasMoreElements()) {
                     String name = entries.nextElement();
@@ -248,6 +249,8 @@ public final class VisibilityHook extends XposedModule {
                         // Unrelated optional dependencies are not service candidates.
                     }
                 }
+            } finally {
+                dex.close();
             }
         }
         if (selected == null) throw new NoSuchMethodException("No factory returning " + service.getName());
