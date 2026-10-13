@@ -12,4 +12,12 @@
     <string name="hide_icon">隐藏桌面图标</string>
     <string name="hide_icon_hint">隐藏后可从 LSPosed 的模块设置打开此页面，关闭开关即可恢复图标。启动器可能需要稍等片刻才刷新。</string>
     <string name="setting_failed">设置失败：%1$s</string>
+    <string name="target_outdated">存储隔离版本过旧，请升级后再导出日志</string>
+    <string name="target_unsupported">当前存储隔离版本暂不支持，请安装支持的版本</string>
+    <string name="target_version_detail">当前版本：%1$s\n支持版本：%2$s</string>
+    <string name="target_missing">未检测到存储隔离</string>
+    <string name="target_required">请安装存储隔离 %1$s，或检查是否被应用隐藏功能屏蔽。</string>
+    <string name="target_check_failed">无法读取存储隔离版本，请重试</string>
+    <string name="target_check_retry">重新打开此页面后再试。</string>
+    <string name="unknown_version">未知</string>
 </resources>
