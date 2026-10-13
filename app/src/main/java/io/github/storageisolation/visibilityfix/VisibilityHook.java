@@ -3,8 +3,6 @@ package io.github.storageisolation.visibilityfix;
 import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import dalvik.system.DexFile;
-import java.util.Enumeration;
 import android.util.Log;
 import android.os.SystemClock;
 import java.lang.reflect.Method;
@@ -173,9 +171,7 @@ public final class VisibilityHook extends XposedModule {
         if (!TARGET_PACKAGE.equals(param.getPackageName())) return;
         try {
             ClassLoader loader = param.getDefaultClassLoader();
-            ServiceBinding binding = resolveServiceBinding(loader,
-                    param.getApplicationInfo().sourceDir,
-                    param.getApplicationInfo().splitSourceDirs);
+            ServiceBinding binding = resolveServiceBinding(loader);
             hook(binding.list).intercept(chain -> {
                 Object result = chain.proceed();
                 if (result instanceof List && ((List<?>) result).isEmpty()) {
@@ -190,77 +186,20 @@ public final class VisibilityHook extends XposedModule {
                     + " factory=" + binding.factory.getDeclaringClass().getName()
                     + "." + binding.factory.getName());
         } catch (Throwable error) {
-            log(Log.ERROR, TAG, "Automatic Storage Isolation contract detection failed: "
+            log(Log.ERROR, TAG, "Supported Storage Isolation 8.8.1 contract not found: "
                     + error, error);
         }
     }
 
-    private ServiceBinding resolveServiceBinding(ClassLoader loader, String base, String[] splits)
-            throws Exception {
-        java.util.Set<String> names = new java.util.LinkedHashSet<>();
-        List<String> paths = new ArrayList<>();
-        paths.add(base);
-        if (splits != null) java.util.Collections.addAll(paths, splits);
-        for (String path : paths) {
-            DexFile dex = new DexFile(path);
-            try {
-                Enumeration<String> entries = dex.entries();
-                while (entries.hasMoreElements()) {
-                    String name = entries.nextElement();
-                    if (name.startsWith(TARGET_PACKAGE + ".")) names.add(name);
-                }
-            } finally {
-                dex.close();
-            }
-        }
-        List<Class<?>> classes = new ArrayList<>();
-        for (String name : names) {
-            try {
-                classes.add(Class.forName(name, false, loader));
-            } catch (ClassNotFoundException | LinkageError ignored) {
-                // Optional classes with unavailable dependencies cannot be a contract.
-            }
-        }
-        ServiceBinding selected = null;
-        int shapeCandidates = 0;
-        for (Class<?> service : classes) {
-            if (service.isInterface() || Modifier.isAbstract(service.getModifiers())) continue;
-            Method list;
-            Method record;
-            try {
-                list = ServiceBinding.findList(service, null);
-                record = ServiceBinding.findRecord(service, null);
-            } catch (NoSuchMethodException | LinkageError ignored) {
-                continue;
-            }
-            shapeCandidates++;
-            Method factory = null;
-            for (Class<?> owner : classes) {
-                try {
-                    Method candidate = ServiceBinding.findFactory(owner, service, null);
-                    if (factory != null) {
-                        throw new IllegalStateException("Multiple factories for " + service.getName());
-                    }
-                    factory = candidate;
-                } catch (NoSuchMethodException error) {
-                    if (error.getMessage().startsWith("Ambiguous")) throw error;
-                } catch (LinkageError ignored) {
-                    // An unrelated optional class is not a service provider.
-                }
-            }
-            if (factory == null) continue;
-            if (selected != null) {
-                throw new IllegalStateException("Multiple complete service contracts: "
-                        + selected.list.getDeclaringClass().getName() + " and " + service.getName());
-            }
-            selected = new ServiceBinding(list, record, factory);
-        }
-        if (selected == null) throw new NoSuchMethodException(
-                "No unique complete service contract; scanned=" + classes.size()
-                + " list/record candidates=" + shapeCandidates);
-        log(Log.INFO, TAG, "Automatic service contract detection: scanned="
-                + classes.size() + " shapeCandidates=" + shapeCandidates);
-        return selected;
+    private ServiceBinding resolveServiceBinding(ClassLoader loader)
+            throws ReflectiveOperationException {
+        Class<?> service = Class.forName(TARGET_PACKAGE + ".ef1", false, loader);
+        Class<?> factory = Class.forName(TARGET_PACKAGE + ".g10", false, loader);
+        // Validated contract for Storage Isolation 8.8.1 r3684.
+        return new ServiceBinding(
+                ServiceBinding.findList(service, "尾巴捏捏"),
+                ServiceBinding.findRecord(service, "没收门"),
+                ServiceBinding.findFactory(factory, service, "嘟嘟噜"));
     }
 
     private Object recoverServiceRecords(ServiceBinding binding,
