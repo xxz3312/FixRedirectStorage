@@ -43,7 +43,7 @@ jobs:
           asset="FixRedirectStorage-${RELEASE_TAG#v}-API102.apk"
           mv dist/app-release.apk "dist/$asset"
           cat > release-notes.md <<'NOTES'
-          Adds a red upgrade notice for unsupported Storage Isolation versions and clearer version and error diagnostics. Keeps the verified 8.8.1 hooks and improves fallback logging for incomplete app lists.
+          Switches to R8-shrunk Release builds, adds adaptive icons and a red upgrade notice for unsupported Storage Isolation versions. Improves diagnostics and fallback enumeration while retaining the verified 8.8.1 hooks.
           NOTES
           if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
             gh release create "$RELEASE_TAG" --target "$RELEASE_TARGET" \
