@@ -12,9 +12,11 @@ Three operations are required on the tested framework:
 
 Existing rule records come from the original service. The module does not fabricate rules or write the rule database. Root service process detection and verbose diagnostic tracing remain removed. A short fallback count is logged to distinguish package enumeration from server record retrieval.
 
-## Compatibility diagnostics (0.22)
+## Supported target version (0.23)
 
-The app-side fallback scans target-package classes in the base APK and splits without initializing them. It resolves a unique concrete service with a non-static `(int,int) -> List` method, a non-static `(String,int,int) -> reference` record method, and a unique static zero-argument factory returning that service type. It uses no obfuscated class or method name table. Multiple complete matches are rejected rather than hooked. Discovery runs once per app process; only metadata is inspected until the fallback is actually called. Signature changes or package relocation still require renewed analysis; this is structural compatibility, not verification against the affected APK.
+The supported Storage Isolation build is 8.8.1 r3684, verified from the originally supplied APK (ARM64 versionCode 36842, versionName 8.8.1.r3684.1ff94a9be-arm64-v8a). The settings screen checks both version name and build revision. Unsupported installations replace the log export button with a red notice and show installed/supported versions. Missing and unreadable installations are reported separately. Returning to the screen rechecks the version so upgrading restores the log button.
+
+The app-side hook uses the verified ef1/g10 method names and validates the full method contract. The experimental APK-wide discovery from 0.22 is removed; this module targets the final known app version.
 
 Package enumeration includes disabled components and permission metadata. Per-package exceptions no longer stop recovery after five failures. Empty service records remain omitted according to the original flags; no default rules are fabricated. Logs now report null-record counts, omitted samples, the list's second argument, application user, versions, and exception context. The supplied logs prove hook installation failure in one case and flag-dependent null records in the other; they do not prove that all omitted records should appear in the UI.
 
