@@ -190,70 +190,76 @@ public final class VisibilityHook extends XposedModule {
                     + " factory=" + binding.factory.getDeclaringClass().getName()
                     + "." + binding.factory.getName());
         } catch (Throwable error) {
-            log(Log.ERROR, TAG, "No complete supported Storage Isolation service contract: "
+            log(Log.ERROR, TAG, "Automatic Storage Isolation contract detection failed: "
                     + error, error);
         }
     }
 
     private ServiceBinding resolveServiceBinding(ClassLoader loader, String base, String[] splits)
             throws Exception {
-        Exception last = null;
-        for (String name : new String[]{"ef1", "bh1"}) {
-            try {
-                Class<?> service = Class.forName(TARGET_PACKAGE + "." + name, false, loader);
-                boolean original = name.equals("ef1");
-                Method list = ServiceBinding.findList(service, original ? "尾巴捏捏" : null);
-                Method record = ServiceBinding.findRecord(service, original ? "没收门" : null);
-                Method factory = findServiceFactory(loader, service, original, base, splits);
-                return new ServiceBinding(list, record, factory);
-            } catch (Exception error) {
-                last = error;
-            }
-        }
-        throw new ReflectiveOperationException(
-                "Neither ef1 nor bh1 matched a complete, unambiguous service contract", last);
-    }
-
-    private Method findServiceFactory(ClassLoader loader, Class<?> service, boolean original,
-            String base, String[] splits) throws Exception {
-        try {
-            Class<?> owner = Class.forName(TARGET_PACKAGE + ".g10", false, loader);
-            return ServiceBinding.findFactory(owner, service, original ? "嘟嘟噜" : null);
-        } catch (ClassNotFoundException | NoSuchMethodException ignored) {
-            if (original) throw ignored;
-        }
-        // Only needed for the renamed wrapper. Scan once, without initializing classes.
+        java.util.Set<String> names = new java.util.LinkedHashSet<>();
         List<String> paths = new ArrayList<>();
         paths.add(base);
         if (splits != null) java.util.Collections.addAll(paths, splits);
-        Method selected = null;
-        java.util.Set<String> seen = new java.util.HashSet<>();
         for (String path : paths) {
             DexFile dex = new DexFile(path);
             try {
                 Enumeration<String> entries = dex.entries();
                 while (entries.hasMoreElements()) {
                     String name = entries.nextElement();
-                    if (!name.startsWith(TARGET_PACKAGE + ".") || !seen.add(name)) continue;
-                    try {
-                        Class<?> owner = Class.forName(name, false, loader);
-                        Method candidate = ServiceBinding.findFactory(owner, service, null);
-                        if (selected != null) {
-                            throw new IllegalStateException("Ambiguous service factories: "
-                                    + selected + " and " + candidate);
-                        }
-                        selected = candidate;
-                    } catch (NoSuchMethodException error) {
-                        if (error.getMessage().startsWith("Ambiguous")) throw error;
-                    } catch (LinkageError ignored) {
-                        // Unrelated optional dependencies are not service candidates.
-                    }
+                    if (name.startsWith(TARGET_PACKAGE + ".")) names.add(name);
                 }
             } finally {
                 dex.close();
             }
         }
-        if (selected == null) throw new NoSuchMethodException("No factory returning " + service.getName());
+        List<Class<?>> classes = new ArrayList<>();
+        for (String name : names) {
+            try {
+                classes.add(Class.forName(name, false, loader));
+            } catch (ClassNotFoundException | LinkageError ignored) {
+                // Optional classes with unavailable dependencies cannot be a contract.
+            }
+        }
+        ServiceBinding selected = null;
+        int shapeCandidates = 0;
+        for (Class<?> service : classes) {
+            if (service.isInterface() || Modifier.isAbstract(service.getModifiers())) continue;
+            Method list;
+            Method record;
+            try {
+                list = ServiceBinding.findList(service, null);
+                record = ServiceBinding.findRecord(service, null);
+            } catch (NoSuchMethodException | LinkageError ignored) {
+                continue;
+            }
+            shapeCandidates++;
+            Method factory = null;
+            for (Class<?> owner : classes) {
+                try {
+                    Method candidate = ServiceBinding.findFactory(owner, service, null);
+                    if (factory != null) {
+                        throw new IllegalStateException("Multiple factories for " + service.getName());
+                    }
+                    factory = candidate;
+                } catch (NoSuchMethodException error) {
+                    if (error.getMessage().startsWith("Ambiguous")) throw error;
+                } catch (LinkageError ignored) {
+                    // An unrelated optional class is not a service provider.
+                }
+            }
+            if (factory == null) continue;
+            if (selected != null) {
+                throw new IllegalStateException("Multiple complete service contracts: "
+                        + selected.list.getDeclaringClass().getName() + " and " + service.getName());
+            }
+            selected = new ServiceBinding(list, record, factory);
+        }
+        if (selected == null) throw new NoSuchMethodException(
+                "No unique complete service contract; scanned=" + classes.size()
+                + " list/record candidates=" + shapeCandidates);
+        log(Log.INFO, TAG, "Automatic service contract detection: scanned="
+                + classes.size() + " shapeCandidates=" + shapeCandidates);
         return selected;
     }
 
