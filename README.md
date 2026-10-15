@@ -12,13 +12,13 @@ Three operations are required on the tested framework:
 
 Existing rule records come from the original service. The module does not fabricate rules or write the rule database. Root service process detection and verbose diagnostic tracing remain removed. A short fallback count is logged to distinguish package enumeration from server record retrieval.
 
-## Pending fix: incomplete package enumeration
+## Version 0.24: incomplete package enumeration
 
 An app-side PackageManager query can return a nonempty list while still hiding installed packages. Empty service-list recovery now unions those names with a read-only root package catalog, then requests every isolation record from the original service with the original flags. It does not enable isolation, grant permissions, modify other modules, or write rules.
 
 The catalog respects explicit user IDs and enumerates existing users for `user=-1`; candidates are deduplicated by package name and user ID. Root enumeration runs only off the main thread, has an eight-second deadline and an output limit, caches successful catalogs for five seconds, and backs off failures for thirty seconds. A denied, failed, or incomplete root query leaves app-side recovery available. Root access is subject to the Storage Isolation app's existing root-manager authorization.
 
-Source changes only: no APK build, release, or device verification has been performed for this pending fix.
+Build-only validation is performed on the fix branch. Device verification remains pending; publishing a Release requires a separate explicit request.
 
 ## Supported target version (0.23)
 
@@ -36,7 +36,7 @@ Version 0.17 resolves the Storage Isolation app ID dynamically from the system p
 
 Version 0.18 adds a PackageManagerInternal fallback when snapshot lookup is unavailable or throws, and retries failed identity resolution after 30 seconds using a monotonic clock. Successful identities remain bound to their package snapshot, preventing stale AppIDs after reinstall. Reflection uses public declaring types so private service implementations do not cause access failures. The three hook operations and native service-record recovery remain unchanged.
 
-GitHub Actions builds the APK on pushes to main, or through **Actions → Build LSPosed module → Run workflow**. Download the `storage-isolation-visibility-fix-release` artifact for installation. The separate `storage-isolation-visibility-fix-debug` artifact is for validation only and is never used by the publishing workflow.
+GitHub Actions builds the APK on pushes to main and the `fix/root-package-candidates` branch, or through **Actions → Build LSPosed module → Run workflow**. Download the `storage-isolation-visibility-fix-release` artifact for installation. The build runs unit tests and uploads only the Release APK.
 
 Version 0.19 adds a Material 3 settings screen with dark mode and supported-device dynamic colors. Exporting diagnostics saves a log to Download and copies a FileProvider file URI to the clipboard; pasting files requires a receiving app that supports URI clipboard items. Diagnostic export requires root. Empty-list recovery also attempts a bounded, read-only root package-name query from the Storage Isolation process. The clipboard copy is served from the app cache and can be removed by clearing the cache.
 
