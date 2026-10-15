@@ -5,10 +5,13 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.util.Log;
 import android.os.SystemClock;
+import android.os.Looper;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import io.github.libxposed.api.XposedModule;
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam;
 import io.github.libxposed.api.XposedModuleInterface.SystemServerStartingParam;
@@ -25,6 +28,7 @@ public final class VisibilityHook extends XposedModule {
     private Class<?> packageManagerInternal;
     private Method internalPackageStateLookup;
     private boolean uidLookupErrorLogged;
+    private final RootPackageCatalog rootPackages = new RootPackageCatalog();
 
     @Override public void onSystemServerStarting(SystemServerStartingParam param) {
         try {
@@ -209,42 +213,72 @@ public final class VisibilityHook extends XposedModule {
                     .getDeclaredMethod("currentApplication").invoke(null);
             if (!(app instanceof Context)) return original;
             Context context = (Context) app;
-            List<PackageInfo> installed = context.getPackageManager().getInstalledPackages(
-                    PackageManager.MATCH_DISABLED_COMPONENTS | PackageManager.GET_PERMISSIONS);
             Object service = binding.factory.invoke(null);
             if (service == null) {
                 log(Log.WARN, TAG, "Service factory returned null; preserving original list");
                 return original;
             }
+            if (listArgument < -1) return original;
+            Set<RootPackageCatalog.Entry> candidates = new LinkedHashSet<>();
+            int appUser = android.os.Process.myUid() / 100000;
+            // A single-user request must never silently return the application's user.
+            if (listArgument == -1 || listArgument == appUser) {
+                try {
+                    List<PackageInfo> installed = context.getPackageManager().getInstalledPackages(
+                            PackageManager.MATCH_DISABLED_COMPONENTS | PackageManager.GET_PERMISSIONS);
+                    for (PackageInfo info : installed) {
+                        if (info != null && info.packageName != null) {
+                            candidates.add(new RootPackageCatalog.Entry(info.packageName, appUser));
+                        }
+                    }
+                } catch (RuntimeException error) {
+                    log(Log.WARN, TAG, "Application package enumeration failed", error);
+                }
+            }
+            int appCandidates = candidates.size();
+            // Package visibility can leave a nonempty but incomplete app-side list.
+            // Add root names even in that case; isolation records still come from the server.
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                try {
+                    candidates.addAll(rootPackages.query(listArgument));
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    return original;
+                } catch (java.io.IOException | RuntimeException error) {
+                    log(Log.WARN, TAG, "Root package names unavailable; keeping app candidates", error);
+                }
+            } else {
+                log(Log.WARN, TAG, "Skipping root package query on main thread");
+            }
             List<Object> recovered = new ArrayList<>();
             List<String> omittedSample = new ArrayList<>();
             int failures = 0;
             int nullRecords = 0;
-            for (PackageInfo info : installed) {
-                if (info == null || info.packageName == null) continue;
-                int userId = info.applicationInfo == null
-                        ? android.os.Process.myUid() / 100000 : info.applicationInfo.uid / 100000;
+            for (RootPackageCatalog.Entry candidate : candidates) {
+                int userId = candidate.userId;
                 try {
                     // Preserve record flags and the server's filtering semantics.
-                    Object record = binding.record.invoke(service, info.packageName, flags, userId);
+                    Object record = binding.record.invoke(service, candidate.packageName, flags, userId);
                     if (record != null) {
                         recovered.add(record);
                     } else {
                         nullRecords++;
-                        if (omittedSample.size() < 8) omittedSample.add(info.packageName + "@u" + userId);
+                        if (omittedSample.size() < 8) omittedSample.add(candidate.packageName + "@u" + userId);
                     }
                 } catch (ReflectiveOperationException | RuntimeException error) {
                     if (++failures == 1) {
                         log(Log.WARN, TAG, "Single package lookup failed: "
-                                + info.packageName + ": " + error, error);
+                                + candidate.packageName + ": " + error, error);
                     }
                     // An isolated package failure must not truncate all later packages.
                 }
             }
-            log(Log.INFO, TAG, "fallback installed=" + installed.size()
+            log(Log.INFO, TAG, "fallback installed=" + candidates.size()
+                    + " appCandidates=" + appCandidates
+                    + " rootAdded=" + (candidates.size() - appCandidates)
                     + " nativeRecords=" + recovered.size() + " nullRecords=" + nullRecords
                     + " failures=" + failures + " flags=" + flags + " listArg=" + listArgument
-                    + " appUser=" + android.os.Process.myUid() / 100000
+                    + " appUser=" + appUser
                     + " omittedSample=" + omittedSample);
             return recovered.isEmpty() ? original : recovered;
         } catch (Throwable error) {
