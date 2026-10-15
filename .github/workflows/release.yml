@@ -6,15 +6,15 @@ on:
       tag:
         description: Release tag
         required: true
-        default: v0.23
+        default: v0.24
       run_id:
         description: Successful Build LSPosed module run containing a signed Release APK
         required: true
-        default: '38449688643'
+        default: '38694772443'
       target:
         description: Source commit or branch for the release tag
         required: true
-        default: main
+        default: be1f55fe350a178ebdd0d80cd687414ffaa5705a
 
 permissions:
   contents: write
@@ -26,13 +26,13 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      RELEASE_TAG: ${{ inputs.tag || 'v0.23' }}
+      RELEASE_TAG: ${{ inputs.tag || 'v0.24' }}
       RELEASE_TARGET: ${{ inputs.target || github.sha }}
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: storage-isolation-visibility-fix-release
-          run-id: ${{ inputs.run_id || '38449688643' }}
+          run-id: ${{ inputs.run_id || '38694772443' }}
           github-token: ${{ github.token }}
           path: dist
       - name: Publish existing APK
@@ -43,7 +43,7 @@ jobs:
           asset="FixRedirectStorage-${RELEASE_TAG#v}-API102.apk"
           mv dist/app-release.apk "dist/$asset"
           cat > release-notes.md <<'NOTES'
-          Switches to R8-shrunk Release builds, adds adaptive icons and a red upgrade notice for unsupported Storage Isolation versions. Improves diagnostics and fallback enumeration while retaining the verified 8.8.1 hooks.
+          Adds bounded root enumeration to recover packages missing from the app-visible list. Fixes user-scoped recovery while preserving the original isolation records.
           NOTES
           if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
             gh release create "$RELEASE_TAG" --target "$RELEASE_TARGET" \
